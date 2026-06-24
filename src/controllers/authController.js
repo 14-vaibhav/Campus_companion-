@@ -1,4 +1,4 @@
-﻿const db = require('../config/db');
+const db = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -8,14 +8,14 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 exports.register = async (req, res, next) => {
   try {
     const { username, email, password, role } = req.body;
-    const existing = await db.query('SELECT id FROM users WHERE email = ', [email]);
+    const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existing.rows.length > 0) {
       return res.status(409).json({ error: 'Email is already registered' });
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     const userRole = role === 'admin' ? 'admin' : 'user';
     const { rows } = await db.query(
-      'INSERT INTO users (username, email, password, role) VALUES (, , , ) RETURNING id, username, email, role, created_at',
+      'INSERT INTO users (username, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, username, email, role, created_at',
       [username || null, email, hashedPassword, userRole]
     );
     const user = rows[0];
@@ -29,7 +29,7 @@ exports.register = async (req, res, next) => {
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const { rows } = await db.query('SELECT * FROM users WHERE email = ', [email]);
+    const { rows } = await db.query('SELECT * FROM users WHERE email = $1', [email]);
     if (rows.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
     const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
@@ -43,7 +43,7 @@ exports.login = async (req, res, next) => {
 
 exports.getMe = async (req, res, next) => {
   try {
-    const { rows } = await db.query('SELECT id, username, email, role, created_at FROM users WHERE id = ', [req.user.id]);
+    const { rows } = await db.query('SELECT id, username, email, role, created_at FROM users WHERE id = $1', [req.user.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
     res.status(200).json(rows[0]);
   } catch (error) {

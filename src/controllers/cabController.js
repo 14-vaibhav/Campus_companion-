@@ -3,20 +3,48 @@ const db = require('../config/db');
 // Get all cabs
 exports.getAllCabs = async (req, res, next) => {
   try {
-    const { is_verified } = req.query;
+    const { is_verified, limit, offset, page } = req.query;
     let query = 'SELECT * FROM cabs WHERE 1=1';
+    let countQuery = 'SELECT COUNT(*) FROM cabs WHERE 1=1';
     const params = [];
     let paramIndex = 1;
 
     if (is_verified !== undefined) {
+      const isVerifiedVal = is_verified === 'true';
       query += ` AND is_verified = $${paramIndex}`;
-      params.push(is_verified === 'true');
+      countQuery += ` AND is_verified = $${paramIndex}`;
+      params.push(isVerifiedVal);
       paramIndex++;
     }
 
-    query += ' ORDER BY id ASC';
-    const { rows } = await db.query(query, params);
-    res.status(200).json(rows);
+    const hasPagination = limit !== undefined || offset !== undefined || page !== undefined;
+
+    if (hasPagination) {
+      const parsedLimit = parseInt(limit) || 10;
+      const parsedPage = parseInt(page) || 1;
+      const parsedOffset = offset !== undefined ? parseInt(offset) : (parsedPage - 1) * parsedLimit;
+
+      // Count total records
+      const countRes = await db.query(countQuery, params);
+      const total = parseInt(countRes.rows[0].count);
+
+      // Fetch paginated data
+      const dataQuery = query + ` ORDER BY id ASC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      const dataParams = [...params, parsedLimit, parsedOffset];
+
+      const { rows } = await db.query(dataQuery, dataParams);
+      res.status(200).json({
+        total,
+        limit: parsedLimit,
+        offset: parsedOffset,
+        page: page !== undefined ? parsedPage : Math.floor(parsedOffset / parsedLimit) + 1,
+        data: rows
+      });
+    } else {
+      query += ' ORDER BY id ASC';
+      const { rows } = await db.query(query, params);
+      res.status(200).json(rows);
+    }
   } catch (error) {
     next(error);
   }

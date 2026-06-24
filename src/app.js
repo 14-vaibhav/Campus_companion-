@@ -1,13 +1,48 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
 
-// Middleware
+// Security Middlewares
+app.use(helmet({
+  contentSecurityPolicy: false, // Ensure Swagger UI styles and scripts load correctly
+}));
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Generic Rate Limiter for all API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      message: 'Too many requests from this IP, please try again after 15 minutes'
+    }
+  }
+});
+
+// Strict Rate Limiter for Auth endpoints (Login, Register)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15, // Limit each IP to 15 login/registration requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: {
+      message: 'Too many login or registration attempts, please try again after 15 minutes'
+    }
+  }
+});
+
+// Apply rate limiters
+app.use('/api', apiLimiter);
+app.use('/api/auth', authLimiter);
 
 // Root route
 app.get('/', (req, res) => {
@@ -25,18 +60,28 @@ app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
 });
 
 // Import route modules
+const authRoutes = require('./routes/authRoutes');
 const salonRoutes = require('./routes/salonRoutes');
 const restaurantRoutes = require('./routes/restaurantRoutes');
 const laundryRoutes = require('./routes/laundryRoutes');
 const cabRoutes = require('./routes/cabRoutes');
 const autoRoutes = require('./routes/autoRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
+
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpecs = require('./config/swagger');
 
 // Mount routes
+app.use('/api/auth', authRoutes);
 app.use('/api/salons', salonRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/laundries', laundryRoutes);
 app.use('/api/cabs', cabRoutes);
 app.use('/api/autos', autoRoutes);
+app.use('/api/upload', uploadRoutes);
+
+// Mount API documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
 // Global Error Handler
 app.use((err, req, res, next) => {

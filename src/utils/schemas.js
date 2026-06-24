@@ -130,6 +130,19 @@ const salonPutSchema = Joi.object({
   logo_url: Joi.string().uri().allow(null, '')
 }).min(1);
 
+// ================= Auth Schemas =================
+const registerSchema = Joi.object({
+  username: Joi.string().max(100).allow(null, ''),
+  email: Joi.string().email().max(255).required(),
+  password: Joi.string().min(6).max(255).required(),
+  role: Joi.string().valid('user', 'admin').default('user')
+});
+
+const loginSchema = Joi.object({
+  email: Joi.string().email().max(255).required(),
+  password: Joi.string().max(255).required()
+});
+
 module.exports = {
   cabPostSchema,
   cabPutSchema,
@@ -140,5 +153,8 @@ module.exports = {
   restaurantPostSchema,
   restaurantPutSchema,
   salonPostSchema,
-  salonPutSchema
+  salonPutSchema,
+  registerSchema,
+  loginSchema
 };
+

@@ -1,0 +1,278 @@
+====================================================
+   CAMPUS COMPANION — BACKEND FEATURE REFERENCE
+====================================================
+
+Base URL: http://localhost:<PORT>/api
+Swagger Docs: http://localhost:<PORT>/api-docs
+
+----------------------------------------------------
+1. AUTHENTICATION  (/api/auth)
+----------------------------------------------------
+
+POST   /api/auth/register    → Register a new user
+POST   /api/auth/login       → Login and get JWT token
+GET    /api/auth/me          → Get current user info [REQUIRES TOKEN]
+
+Register Body:
+{
+  "username": "John Doe",
+  "email": "john@example.com",
+  "password": "secret123",
+  "role": "user"         // "user" or "admin"
+}
+
+Login Body:
+{
+  "email": "john@example.com",
+  "password": "secret123"
+}
+
+Login Response: returns JWT token
+Use as: Authorization: Bearer <token>
+
+User Fields:
+- id, username, email, password (hashed), role, created_at, updated_at
+
+----------------------------------------------------
+2. RESTAURANTS  (/api/restaurants)
+----------------------------------------------------
+
+GET    /api/restaurants          → Get all restaurants (public)
+GET    /api/restaurants/:id      → Get restaurant by ID (public)
+POST   /api/restaurants          → Create restaurant [ADMIN]
+PUT    /api/restaurants/:id      → Update restaurant [ADMIN]
+DELETE /api/restaurants/:id      → Delete restaurant [ADMIN]
+
+Query Filters for GET all:
+  ?location=   → partial match (case-insensitive)
+  ?is_open=    → true / false
+  ?limit=      → records per page
+  ?page=       → page number
+  ?offset=     → manual offset
+
+Paginated Response:
+{
+  "total": 50,
+  "limit": 10,
+  "offset": 0,
+  "page": 1,
+  "data": [...]
+}
+
+Restaurant Fields:
+- id
+- name              (required)
+- description
+- disclaimer
+- location          (required)
+- phone_number      (required)
+- logo_url          (image URL)
+- menu_images       (array of image URLs, stored as JSONB)
+- opening_time      (e.g. "09:00:00")
+- closing_time      (e.g. "22:00:00")
+- is_open           (boolean, default: true)
+- is_verified       (boolean, default: false)
+- average_cost_for_one (integer, INR)
+- created_at
+- updated_at
+
+----------------------------------------------------
+3. LAUNDRY SERVICES  (/api/laundries)
+----------------------------------------------------
+
+GET    /api/laundries          → Get all laundries (public)
+GET    /api/laundries/:id      → Get laundry by ID (public)
+POST   /api/laundries          → Create laundry [ADMIN]
+PUT    /api/laundries/:id      → Update laundry [ADMIN]
+DELETE /api/laundries/:id      → Delete laundry [ADMIN]
+
+Query Filters:
+  ?location=, ?is_open=, ?limit=, ?page=, ?offset=
+
+Laundry Fields:
+- id
+- name              (required)
+- description
+- location          (required)
+- price_per_kg      (integer, INR)
+- phone_number      (required)
+- opening_time
+- closing_time
+- is_open           (boolean, default: true)
+- is_verified       (boolean, default: false)
+- logo_url
+- created_at
+- updated_at
+
+----------------------------------------------------
+4. SALONS / BARBERSHOPS  (/api/salons)
+----------------------------------------------------
+
+GET    /api/salons          → Get all salons (public)
+GET    /api/salons/:id      → Get salon by ID (public)
+POST   /api/salons          → Create salon [ADMIN]
+PUT    /api/salons/:id      → Update salon [ADMIN]
+DELETE /api/salons/:id      → Delete salon [ADMIN]
+
+Query Filters:
+  ?location=, ?is_open=, ?limit=, ?page=, ?offset=
+
+Salon Fields:
+- id
+- name              (required)
+- description
+- location          (required)
+- haircut_price     (integer, INR, required)
+- beard_price       (integer, INR, required)
+- phone_number      (required)
+- opening_time
+- closing_time
+- is_open           (boolean, default: true)
+- is_verified       (boolean, default: false)
+- logo_url
+- created_at
+- updated_at
+
+----------------------------------------------------
+5. CABS  (/api/cabs)
+----------------------------------------------------
+
+GET    /api/cabs          → Get all cab drivers (public)
+GET    /api/cabs/:id      → Get cab by ID (public)
+POST   /api/cabs          → Add cab driver [ADMIN]
+PUT    /api/cabs/:id      → Update cab driver [ADMIN]
+DELETE /api/cabs/:id      → Delete cab driver [ADMIN]
+
+Query Filters:
+  ?is_verified=, ?limit=, ?page=, ?offset=
+
+Cab Fields:
+- id
+- driver_name       (required)
+- vehicle_number    (required)
+- vehicle_model
+- phone_number      (required)
+- base_fare         (integer, INR)
+- is_available      (boolean, default: true)
+- is_verified       (boolean, default: false)
+- created_at
+- updated_at
+
+----------------------------------------------------
+6. AUTOS / AUTO-RICKSHAWS  (/api/autos)
+----------------------------------------------------
+
+GET    /api/autos          → Get all auto drivers (public)
+GET    /api/autos/:id      → Get auto by ID (public)
+POST   /api/autos          → Add auto driver [ADMIN]
+PUT    /api/autos/:id      → Update auto driver [ADMIN]
+DELETE /api/autos/:id      → Delete auto driver [ADMIN]
+
+Query Filters:
+  ?is_verified=, ?limit=, ?page=, ?offset=
+
+Auto Fields:
+- id
+- driver_name       (required)
+- vehicle_number    (required)
+- phone_number      (required)
+- base_fare         (integer, INR)
+- is_available      (boolean, default: true)
+- is_verified       (boolean, default: false)
+- created_at
+- updated_at
+
+----------------------------------------------------
+7. IMAGE UPLOAD  (/api/upload)
+----------------------------------------------------
+
+POST   /api/upload    → Upload image to Cloudinary [ADMIN]
+
+Request: multipart/form-data
+  Field name: "image"
+  Allowed types: jpg, jpeg, png, webp, gif
+
+Response:
+{
+  "message": "File uploaded successfully",
+  "url": "https://res.cloudinary.com/..."
+}
+
+Images stored in Cloudinary folder: "campus_companion"
+
+----------------------------------------------------
+8. ADMIN ACCESS & SECURITY
+----------------------------------------------------
+
+Admin routes require one of the following secure credentials:
+  Option A: Cryptographically signed JWT token where role = "admin"
+            Header: Authorization: Bearer <token>
+            (Recommended - obtained via login)
+
+  Option B: Direct Admin Secret Key validation matching the server's ADMIN_SECRET_KEY
+            Header: Authorization: Bearer <ADMIN_SECRET_KEY>
+            (Used for background services and scripts)
+
+⚠️ Note: The insecure "x-role: admin" bypass header has been completely removed.
+In production, default fallback strings for secrets are blocked.
+
+----------------------------------------------------
+8.5 RATE LIMITING & SECURITY SHIELDS
+----------------------------------------------------
+
+To protect against brute-force and DDoS attacks, rate limiting is active:
+  - Auth Endpoints (/api/auth/*): Max 15 requests per 15 minutes per IP.
+  - General API Endpoints (/api/*): Max 100 requests per 15 minutes per IP.
+  - Security Headers: Helmet middleware is active to prevent Clickjacking, MIME sniffing, and XSS.
+
+To create an admin: register with role: "admin"
+
+----------------------------------------------------
+9. OTHER ENDPOINTS
+----------------------------------------------------
+
+GET  /          → Root health check
+GET  /health    → Detailed health check
+GET  /api-docs  → Swagger UI (interactive API explorer)
+
+----------------------------------------------------
+10. SUMMARY — FRONTEND PAGES TO BUILD
+----------------------------------------------------
+
+  AUTH MODULE
+    - Login page
+    - Register page
+    - Profile / Me page
+
+  RESTAURANT MODULE
+    - Restaurant listing page (with filters)
+    - Restaurant detail page
+    - Admin: Create / Edit / Delete restaurant
+
+  LAUNDRY MODULE
+    - Laundry listing page (with filters)
+    - Laundry detail page
+    - Admin: Create / Edit / Delete laundry
+
+  SALON MODULE
+    - Salon listing page (with filters)
+    - Salon detail page
+    - Admin: Create / Edit / Delete salon
+
+  CAB MODULE
+    - Cab / Driver listing page
+    - Cab detail page
+    - Admin: Create / Edit / Delete cab
+
+  AUTO MODULE
+    - Auto / Driver listing page
+    - Auto detail page
+    - Admin: Create / Edit / Delete auto
+
+  ADMIN PANEL
+    - Dashboard with all 5 service sections
+    - Image upload tool
+
+====================================================
+END OF REFERENCE
+====================================================
