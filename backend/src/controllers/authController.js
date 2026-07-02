@@ -28,12 +28,12 @@ exports.register = async (req, res, next) => {
 
 exports.login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-    const { rows } = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (rows.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
+    const { identifier, password } = req.body;
+    const { rows } = await db.query('SELECT * FROM users WHERE email = $1 OR username = $2', [identifier, identifier]);
+    if (rows.length === 0) return res.status(401).json({ error: 'Invalid username/email or password' });
     const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ error: 'Invalid email or password' });
+    if (!isMatch) return res.status(401).json({ error: 'Invalid username/email or password' });
     const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
     res.status(200).json({ user: { id: user.id, username: user.username, email: user.email, role: user.role }, token });
   } catch (error) {

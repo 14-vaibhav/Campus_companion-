@@ -202,7 +202,7 @@ export default function AdminPage() {
   const handleDelete = async (id) => {
     try {
       if (activeTab === 'notifications') {
-        deleteAdminBroadcast(id);
+        await deleteAdminBroadcast(id);
         toast.success('Broadcast deleted successfully!');
         setDeleteConfirm(null);
         load();
@@ -214,14 +214,14 @@ export default function AdminPage() {
     } catch { toast.error('Delete failed'); }
   };
 
-  const handleBroadcast = (e) => {
+  const handleBroadcast = async (e) => {
     e.preventDefault();
     if (!broadcastTitle.trim() || !broadcastBody.trim()) {
       toast.error('Title and body are required!');
       return;
     }
     try {
-      pushAdminBroadcast({
+      await pushAdminBroadcast({
         type: broadcastType,
         title: broadcastTitle,
         body: broadcastBody,

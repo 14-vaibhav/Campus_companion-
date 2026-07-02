@@ -135,12 +135,19 @@ const registerSchema = Joi.object({
   username: Joi.string().max(100).allow(null, ''),
   email: Joi.string().email().max(255).required(),
   password: Joi.string().min(6).max(255).required(),
-  role: Joi.string().valid('user', 'admin').default('user')
+  role: Joi.string().valid('user').default('user')
 });
 
 const loginSchema = Joi.object({
-  email: Joi.string().email().max(255).required(),
+  identifier: Joi.string().max(255).required(),
   password: Joi.string().max(255).required()
+});
+
+// ================= Notification Schemas =================
+const notificationPostSchema = Joi.object({
+  type: Joi.string().valid('info', 'deal', 'alert', 'update', 'welcome').default('info'),
+  title: Joi.string().max(60).required(),
+  body: Joi.string().max(200).required()
 });
 
 module.exports = {
@@ -155,6 +162,8 @@ module.exports = {
   salonPostSchema,
   salonPutSchema,
   registerSchema,
-  loginSchema
+  loginSchema,
+  notificationPostSchema
 };
+
 

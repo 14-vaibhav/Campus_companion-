@@ -10,7 +10,22 @@ const app = express();
 app.use(helmet({
   contentSecurityPolicy: false, // Ensure Swagger UI styles and scripts load correctly
 }));
-app.use(cors());
+// CORS — allow localhost in dev, read ALLOWED_ORIGIN from .env in production
+const allowedOrigins = [
+  'http://localhost:5173',   // Vite dev server
+  'http://localhost:4173',   // Vite preview
+  'http://localhost:3000',   // fallback
+  process.env.ALLOWED_ORIGIN // production frontend URL (set in .env)
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman) or from allowed list
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS blocked: origin ${origin} is not allowed`));
+  },
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -67,6 +82,7 @@ const laundryRoutes = require('./routes/laundryRoutes');
 const cabRoutes = require('./routes/cabRoutes');
 const autoRoutes = require('./routes/autoRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpecs = require('./config/swagger');
@@ -79,6 +95,7 @@ app.use('/api/laundries', laundryRoutes);
 app.use('/api/cabs', cabRoutes);
 app.use('/api/autos', autoRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Mount API documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));

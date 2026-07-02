@@ -5,8 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import { login as loginApi, register as registerApi, googleLogin } from '../services/authService';
 import toast from 'react-hot-toast';
 
-const HAS_GOOGLE_CLIENT = import.meta.env.VITE_GOOGLE_CLIENT_ID &&
-  import.meta.env.VITE_GOOGLE_CLIENT_ID !== 'your-google-client-id-here.apps.googleusercontent.com';
+const googleId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const HAS_GOOGLE_CLIENT = googleId &&
+  googleId !== 'your-google-client-id-here.apps.googleusercontent.com' &&
+  !googleId.startsWith('dummy-');
 
 export default function LoginPage() {
   const [mode, setMode] = useState('login');
@@ -162,9 +164,12 @@ export default function LoginPage() {
               </div>
             )}
             <div className="input-wrapper">
-              <span className="material-symbols-outlined input-icon" style={{ fontSize: 22 }}>alternate_email</span>
-              <input className="input-field" type="email" name="email" placeholder="Email"
-                value={form.email} onChange={handleChange} required autoComplete="email" />
+              <span className="material-symbols-outlined input-icon" style={{ fontSize: 22 }}>
+                {mode === 'login' ? 'person' : 'alternate_email'}
+              </span>
+              <input className="input-field" type={mode === 'login' ? 'text' : 'email'} name="email"
+                placeholder={mode === 'login' ? 'Username or Email' : 'Email'}
+                value={form.email} onChange={handleChange} required autoComplete={mode === 'login' ? 'username' : 'email'} />
             </div>
             <div className="input-wrapper">
               <span className="material-symbols-outlined input-icon" style={{ fontSize: 22 }}>lock</span>

@@ -1,10 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import api from '../services/api';
 
 const NotificationsContext = createContext(null);
 
-const PERSONAL_KEY    = 'campus_notifications';
-const ADMIN_KEY       = 'campus_admin_notifications';
-const SEEDED_FLAG     = 'campus_notif_seeded';
 const READ_IDS_KEY    = 'campus_notif_read_ids';
 const DELETED_IDS_KEY = 'campus_notif_deleted_ids';
 
@@ -16,55 +14,6 @@ const TYPE_META = {
   info:    { icon: 'info',           iconColor: '#0ea5e9', iconBg: '#e0f2fe' },
 };
 
-const SEEDS = [
-  {
-    id: 'seed-1',
-    type: 'welcome',
-    title: 'Welcome to CampusHub! 👋',
-    body: 'Explore restaurants, salons, laundries, cabs & autos — all in one place. Tap any service to get started.',
-    source: 'system',
-  },
-  {
-    id: 'seed-2',
-    type: 'deal',
-    title: '20% off at The Campus Cafe 🏷️',
-    body: 'Show this notification at the counter to avail 20% off on all orders this weekend. Valid Sat–Sun only.',
-    source: 'system',
-  },
-  {
-    id: 'seed-3',
-    type: 'info',
-    title: 'New auto-rickshaw drivers registered ℹ️',
-    body: '3 new auto drivers have been added near Block C. Check the Autos section to view availability and fares.',
-    source: 'system',
-  },
-];
-
-// Build a notification object with expiry
-function makeNotif(partial) {
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  const meta = TYPE_META[partial.type] || TYPE_META.info;
-  return {
-    id: partial.id || `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    type: partial.type || 'info',
-    title: partial.title || '',
-    body: partial.body || '',
-    icon: meta.icon,
-    iconColor: meta.iconColor,
-    iconBg: meta.iconBg,
-    timestamp: partial.timestamp || now.toISOString(),
-    expiresAt: partial.expiresAt || expiresAt,
-    source: partial.source || 'system',
-  };
-}
-
-// Remove entries whose expiresAt has passed
-function purgeExpired(list) {
-  const now = new Date();
-  return list.filter((n) => new Date(n.expiresAt) > now);
-}
-
 function readJSON(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
 }
@@ -74,30 +23,23 @@ function writeJSON(key, value) {
 }
 
 export function NotificationsProvider({ children }) {
-  const [personalNotifs, setPersonalNotifs] = useState([]);
-  const [adminNotifs, setAdminNotifs]       = useState([]);
-  const [readIds, setReadIds]               = useState(() => new Set(readJSON(READ_IDS_KEY, [])));
-  const [deletedIds, setDeletedIds]         = useState(() => new Set(readJSON(DELETED_IDS_KEY, [])));
+  const [backendNotifs, setBackendNotifs] = useState([]);
+  const [readIds, setReadIds]             = useState(() => new Set(readJSON(READ_IDS_KEY, [])));
+  const [deletedIds, setDeletedIds]       = useState(() => new Set(readJSON(DELETED_IDS_KEY, [])));
 
-  // --- Load & seed on mount ---
-  useEffect(() => {
-    // 1. Seed personal notifications once
-    if (!localStorage.getItem(SEEDED_FLAG)) {
-      const seeded = SEEDS.map(makeNotif);
-      writeJSON(PERSONAL_KEY, seeded);
-      localStorage.setItem(SEEDED_FLAG, 'true');
-      setPersonalNotifs(seeded);
-    } else {
-      const stored = purgeExpired(readJSON(PERSONAL_KEY, []));
-      writeJSON(PERSONAL_KEY, stored);
-      setPersonalNotifs(stored);
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await api.get('/notifications');
+      setBackendNotifs(res.data);
+    } catch (err) {
+      console.error('Failed to fetch notifications', err);
     }
-
-    // 2. Load admin notifications (shared key), purge expired
-    const admin = purgeExpired(readJSON(ADMIN_KEY, []));
-    writeJSON(ADMIN_KEY, admin);
-    setAdminNotifs(admin);
   }, []);
+
+  // Fetch on mount
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   // Persist readIds whenever they change
   useEffect(() => {
@@ -109,23 +51,28 @@ export function NotificationsProvider({ children }) {
     writeJSON(DELETED_IDS_KEY, [...deletedIds]);
   }, [deletedIds]);
 
-  // Re-read admin broadcasts when window gains focus (other tabs may have pushed)
+  // Re-read when focus returns
   useEffect(() => {
     const onFocus = () => {
-      const admin = purgeExpired(readJSON(ADMIN_KEY, []));
-      setAdminNotifs(admin);
+      fetchNotifications();
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, []);
+  }, [fetchNotifications]);
 
   // --- Merged, sorted, visible notifications ---
-  const notifications = [
-    ...personalNotifs,
-    ...adminNotifs.filter((n) => !deletedIds.has(n.id)),
-  ]
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-    .map((n) => ({ ...n, read: readIds.has(n.id) }));
+  const notifications = backendNotifs
+    .filter((n) => !deletedIds.has(n.id))
+    .map((n) => {
+      const meta = TYPE_META[n.type] || TYPE_META.info;
+      return {
+        ...n,
+        icon: meta.icon,
+        iconColor: meta.iconColor,
+        iconBg: meta.iconBg,
+        read: readIds.has(n.id),
+      };
+    });
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -135,54 +82,48 @@ export function NotificationsProvider({ children }) {
   }, []);
 
   const markAllRead = useCallback(() => {
-    const allIds = [
-      ...personalNotifs.map((n) => n.id),
-      ...adminNotifs.map((n) => n.id),
-    ];
+    const allIds = backendNotifs.map((n) => n.id);
     setReadIds((prev) => new Set([...prev, ...allIds]));
-  }, [personalNotifs, adminNotifs]);
+  }, [backendNotifs]);
 
   const deleteNotification = useCallback((id) => {
-    // If it's personal, remove from array
-    setPersonalNotifs((prev) => {
-      const next = prev.filter((n) => n.id !== id);
-      writeJSON(PERSONAL_KEY, next);
-      return next;
-    });
-    // If it's admin, track as deleted
     setDeletedIds((prev) => new Set([...prev, id]));
-    // Also mark as read so badge updates instantly
     setReadIds((prev) => new Set([...prev, id]));
   }, []);
 
   const clearAll = useCallback(() => {
-    setPersonalNotifs([]);
-    writeJSON(PERSONAL_KEY, []);
-    const adminIds = adminNotifs.map((n) => n.id);
-    setDeletedIds((prev) => new Set([...prev, ...adminIds]));
-    setReadIds((prev) => new Set([...prev, ...adminIds]));
-  }, [adminNotifs]);
+    const allIds = backendNotifs.map((n) => n.id);
+    setDeletedIds((prev) => new Set([...prev, ...allIds]));
+    setReadIds((prev) => new Set([...prev, ...allIds]));
+  }, [backendNotifs]);
 
   // --- Admin: push a broadcast ---
-  const pushAdminBroadcast = useCallback((partial) => {
-    const notif = makeNotif({ ...partial, source: 'admin' });
-    const updated = [notif, ...purgeExpired(readJSON(ADMIN_KEY, []))];
-    writeJSON(ADMIN_KEY, updated);
-    setAdminNotifs(updated);
-    return notif;
+  const pushAdminBroadcast = useCallback(async (partial) => {
+    try {
+      const res = await api.post('/notifications', partial);
+      setBackendNotifs((prev) => [res.data, ...prev]);
+      return res.data;
+    } catch (err) {
+      console.error('Failed to push admin broadcast', err);
+      throw err;
+    }
   }, []);
 
   // --- Admin: delete a broadcast for everyone ---
-  const deleteAdminBroadcast = useCallback((id) => {
-    const updated = purgeExpired(readJSON(ADMIN_KEY, [])).filter((n) => n.id !== id);
-    writeJSON(ADMIN_KEY, updated);
-    setAdminNotifs(updated);
+  const deleteAdminBroadcast = useCallback(async (id) => {
+    try {
+      await api.delete(`/notifications/${id}`);
+      setBackendNotifs((prev) => prev.filter((n) => n.id !== id));
+    } catch (err) {
+      console.error('Failed to delete admin broadcast', err);
+      throw err;
+    }
   }, []);
 
   // --- Admin: read all broadcasts ---
   const getAdminBroadcasts = useCallback(() => {
-    return purgeExpired(readJSON(ADMIN_KEY, []));
-  }, []);
+    return backendNotifs;
+  }, [backendNotifs]);
 
   return (
     <NotificationsContext.Provider value={{

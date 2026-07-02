@@ -66,6 +66,11 @@ export default function ProfilePage() {
         {/* Actions */}
         <div className="glass-card animate-fade-in-up" style={{ padding: '8px 0', marginBottom: 16 }}>
           {[
+            ...(user?.role === 'admin' ? [{
+              icon: 'admin_panel_settings',
+              label: 'Control Center (Admin)',
+              action: () => navigate('/control-center'),
+            }] : []),
             {
               icon: 'favorite',
               label: 'Saved Services',

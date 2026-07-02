@@ -1,7 +1,15 @@
 import axios from 'axios';
 
+const getBaseURL = () => {
+  const isNative = window.Capacitor || window.cordova || !['http:', 'https:'].includes(window.location.protocol);
+  if (isNative) {
+    return 'http://10.0.2.2:5000/api';
+  }
+  return 'http://localhost:5000/api';
+};
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: getBaseURL(),
   headers: { 'Content-Type': 'application/json' },
 });
 
